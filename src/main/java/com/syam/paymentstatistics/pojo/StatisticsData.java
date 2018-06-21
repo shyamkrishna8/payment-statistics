@@ -16,6 +16,15 @@ public class StatisticsData {
 
 	}
 
+	public StatisticsData(StatisticsData s) {
+		super();
+		this.sum = s.getSum();
+		this.avg = s.getAvg();
+		this.max = s.getMax();
+		this.min = s.getMin();
+		this.count = s.getCount();
+	}
+
 	public double getSum() {
 		return sum;
 	}

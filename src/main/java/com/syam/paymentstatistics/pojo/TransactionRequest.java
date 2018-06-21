@@ -7,6 +7,7 @@ import com.syam.paymentstatistics.utils.Constants;
 public class TransactionRequest {
 	private Double amount;
 	private long timestamp;
+	private Boolean test;
 
 	public TransactionRequest() {
 		super();
@@ -26,6 +27,14 @@ public class TransactionRequest {
 
 	public void setTimestamp(long timestamp) {
 		this.timestamp = timestamp;
+	}
+
+	public Boolean getTest() {
+		return test;
+	}
+
+	public void setTest(Boolean test) {
+		this.test = test;
 	}
 
 	public void validate() {
