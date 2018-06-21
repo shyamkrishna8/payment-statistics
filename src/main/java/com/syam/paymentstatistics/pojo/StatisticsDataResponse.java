@@ -4,8 +4,8 @@ public class StatisticsDataResponse {
 
 	private double sum;
 	private double avg;
-	private double max;
-	private double min;
+	private Double max;
+	private Double min;
 	private int count;
 
 	public StatisticsDataResponse() {
@@ -16,8 +16,8 @@ public class StatisticsDataResponse {
 		super();
 		this.sum = sd.getSum().doubleValue();
 		this.avg = sd.getAvg().doubleValue();
-		this.max = sd.getMax().doubleValue();
-		this.min = sd.getMin().doubleValue();
+		this.max = sd.getMax() == null ? null : sd.getMax().doubleValue();
+		this.min = sd.getMin() == null ? null : sd.getMin().doubleValue();
 		this.count = sd.getCount().intValue();
 	}
 
@@ -46,19 +46,19 @@ public class StatisticsDataResponse {
 		this.avg = avg;
 	}
 
-	public double getMax() {
+	public Double getMax() {
 		return max;
 	}
 
-	public void setMax(double max) {
+	public void setMax(Double max) {
 		this.max = max;
 	}
 
-	public double getMin() {
+	public Double getMin() {
 		return min;
 	}
 
-	public void setMin(double min) {
+	public void setMin(Double min) {
 		this.min = min;
 	}
 

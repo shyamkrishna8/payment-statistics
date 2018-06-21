@@ -12,8 +12,8 @@ public class StatisticsData {
 
 	private AtomicDouble sum;
 	private AtomicDouble avg;
-	private AtomicDouble max;
-	private AtomicDouble min;
+	private AtomicDouble max = null;
+	private AtomicDouble min = null;
 	private AtomicInteger count;
 
 	public StatisticsData() {
@@ -25,8 +25,8 @@ public class StatisticsData {
 		super();
 		this.sum = new AtomicDouble(s.getSum().doubleValue());
 		this.avg = new AtomicDouble(s.getAvg().doubleValue());
-		this.max = new AtomicDouble(s.getMax().doubleValue());
-		this.min = new AtomicDouble(s.getMin().doubleValue());
+		this.max = s.getMax() == null ? null : new AtomicDouble(s.getMax().doubleValue());
+		this.min = s.getMin() == null ? null : new AtomicDouble(s.getMin().doubleValue());
 		this.count = new AtomicInteger(s.getCount().get());
 	}
 
@@ -35,8 +35,6 @@ public class StatisticsData {
 		this.count.incrementAndGet();
 		// count will never be zero after a transaction addition
 		this.avg = new AtomicDouble(CommonUtils.roundDoubleValue(this.sum.doubleValue() / this.count.intValue()));
-		this.min = this.min.doubleValue() > amount ? new AtomicDouble(amount) : this.min;
-		this.max = this.max.doubleValue() < amount ? new AtomicDouble(amount) : this.max;
 	}
 
 	public AtomicDouble getSum() {
@@ -93,8 +91,8 @@ public class StatisticsData {
 	public void resetValues() {
 		this.sum = new AtomicDouble();
 		this.avg = new AtomicDouble();
-		this.min = new AtomicDouble();
-		this.max = new AtomicDouble();
+		this.min = null;
+		this.max = null;
 		this.count = new AtomicInteger();
 	}
 

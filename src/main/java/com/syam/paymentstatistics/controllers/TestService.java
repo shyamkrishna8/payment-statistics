@@ -34,14 +34,33 @@ public class TestService {
 		int i = 10;
 		Random random = new Random();
 		long currentTime = System.currentTimeMillis();
+		Logger.log("First batch starting  : " + currentTime);
 		while (i > 0) {
 			statisticsService.registerTransaction(new TransactionRequest(
-					CommonUtils.roundDoubleValue(random.nextDouble() * 100), currentTime - 3 * i * 1000, true));
-			Thread.sleep(random.nextInt(400));
-			Logger.log("Statistics at : " + (System.currentTimeMillis() - currentTime) + " statistics : "
-					+ statisticsService.getStatistics().toString());
+					CommonUtils.roundDoubleValue(random.nextDouble() * 100), currentTime - 40 * 1000 + i*1000, true));
+			// Logger.log("Statistics at : " + (System.currentTimeMillis() - currentTime) +
+			// " statistics : "
+			// + statisticsService.getStatistics().toString());
 			i--;
 		}
+		Logger.log("Statistics at : " + (System.currentTimeMillis() - currentTime) + " statistics : "
+				+ statisticsService.getStatistics().toString());
+		Logger.log("First batch complete : " + (System.currentTimeMillis() - currentTime));
+
+		i = 0;
+		Thread.sleep((20 * 1000));
+
+		currentTime = System.currentTimeMillis();
+		Logger.log("Second batch starting : " + System.currentTimeMillis());
+		while (i > 0) {
+			statisticsService.registerTransaction(new TransactionRequest(
+					CommonUtils.roundDoubleValue(random.nextDouble() * 100), currentTime - 40 * 1000 + i, true));
+			// Logger.log("Statistics at : " + (System.currentTimeMillis() - currentTime) +
+			// " statistics : "
+			// + statisticsService.getStatistics().toString());
+			i--;
+		}
+		Logger.log("Second batch ending : " + System.currentTimeMillis());
 
 		Logger.log("Statistics at end : " + (System.currentTimeMillis() - currentTime) + " statistics : "
 				+ statisticsService.getStatistics().toString());
