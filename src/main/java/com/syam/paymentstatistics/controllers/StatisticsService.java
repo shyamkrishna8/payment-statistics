@@ -1,5 +1,8 @@
 package com.syam.paymentstatistics.controllers;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.TreeMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
@@ -24,11 +27,11 @@ public class StatisticsService {
 
 	private static final StatisticsData STATISTICS_DATA = new StatisticsData();
 
-	private static final ScheduledExecutorService SCHEDULED_POOL = Executors.newScheduledThreadPool(1);
+	private static final ScheduledExecutorService SCHEDULED_POOL = Executors.newScheduledThreadPool(100);
 
 	private static volatile ScheduledFuture<?> SCHEDULED_TASK_FUTURE;
 
-	private static TreeMap<Long, TransactionRequest> REMAINING_REQUESTS = new TreeMap<Long, TransactionRequest>();
+	private static TreeMap<Long, List<TransactionRequest>> REMAINING_REQUESTS = new TreeMap<Long, List<TransactionRequest>>();
 
 	// 1. If we read the STATISTICS_DATA when a write operation is going on, the
 	// values in the object may be corrupted with only sum field getting updated but
@@ -40,7 +43,9 @@ public class StatisticsService {
 	// 3. Multiple reads can happen simultaneously when there is write happening as
 	// it wont be modifying the object.
 	// Hence ReentrantReadWriteLock is the right lock for this use case.
-	private static final ReadWriteLock READ_WRITE_LOCK = new ReentrantReadWriteLock();
+	private static final ReadWriteLock STATISTICS_DATA_LOCK = new ReentrantReadWriteLock();
+
+	private static final ReadWriteLock REMAINING_REQUESTS_LOCK = new ReentrantReadWriteLock();
 
 	@Autowired
 	private TransactionAmountRepository transactionRepository;
@@ -64,65 +69,62 @@ public class StatisticsService {
 	}
 
 	public StatisticsDataResponse getStatistics() {
-		READ_WRITE_LOCK.readLock().lock();
+		STATISTICS_DATA_LOCK.readLock().lock();
 		StatisticsDataResponse statisticsData = new StatisticsDataResponse(STATISTICS_DATA);
-		READ_WRITE_LOCK.readLock().unlock();
+		STATISTICS_DATA_LOCK.readLock().unlock();
 		return statisticsData;
 	}
 
 	private static void applyTransaction(TransactionRequest transactionRequest) {
 		Logger.log("Applying transaction : " + transactionRequest.getAmount());
 		// Update statistics object with the transaction values
-		READ_WRITE_LOCK.writeLock().lock();
+		STATISTICS_DATA_LOCK.writeLock().lock();
 		STATISTICS_DATA.addTranscation(transactionRequest.getAmount());
-		READ_WRITE_LOCK.writeLock().unlock();
+		STATISTICS_DATA_LOCK.writeLock().unlock();
 
 		// Schedule a task in future (60s after the time stamp field) for deducting the
 		// amount from STATISTICS_DATA object
-		scheduleTaskToRemoveTranscation(transactionRequest);
+		addNewRequestsToRemoveTranscation(transactionRequest);
+		scheduleTaskToRemoveTranscationIfRequired();
 		Logger.log("Applying transaction done : " + transactionRequest.getAmount());
 	}
 
-	private static void removeTransaction(TransactionRequest transactionRequest) {
+	private static void removeTransaction(List<TransactionRequest> requests) {
 		// Update statistics object with the transaction values
-		READ_WRITE_LOCK.writeLock().lock();
-		STATISTICS_DATA.removeTranscation(transactionRequest.getAmount());
-		READ_WRITE_LOCK.writeLock().unlock();
+		STATISTICS_DATA_LOCK.writeLock().lock();
+		requests.forEach(a -> STATISTICS_DATA.removeTranscation(a));
+		STATISTICS_DATA_LOCK.writeLock().unlock();
 	}
 
-	private static synchronized void scheduleTaskToRemoveTranscation(TransactionRequest transactionRequest) {
+	private static void addNewRequestsToRemoveTranscation(TransactionRequest request) {
+		// Add new requests
+		REMAINING_REQUESTS_LOCK.writeLock().lock();
+		List<TransactionRequest> existingRequests = new ArrayList<>();
+		if (REMAINING_REQUESTS.containsKey(Long.valueOf(request.getExpiryTime()))) {
+			existingRequests = REMAINING_REQUESTS.get(Long.valueOf(request.getExpiryTime()));
+		}
+		existingRequests.add(request);
+		REMAINING_REQUESTS.put(Long.valueOf(request.getExpiryTime()), existingRequests);
+		REMAINING_REQUESTS_LOCK.writeLock().unlock();
+	}
+
+	private static synchronized void scheduleTaskToRemoveTranscationIfRequired() {
 		if (SCHEDULED_TASK_FUTURE == null) {
-			Logger.log("Schedule task is null : " + transactionRequest.getAmount());
+			REMAINING_REQUESTS_LOCK.writeLock().lock();
 			try {
-				REMAINING_REQUESTS.put(transactionRequest.getExpiryTime(), transactionRequest);
-				Logger.log(
-						"Scheduling time delay : " + (transactionRequest.getExpiryTime() - System.currentTimeMillis()));
 				SCHEDULED_TASK_FUTURE = SCHEDULED_POOL.schedule(new WorkerThread(),
-						transactionRequest.getExpiryTime() - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+						REMAINING_REQUESTS.firstEntry().getKey() - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+				REMAINING_REQUESTS_LOCK.writeLock().unlock();
 			} catch (RejectedExecutionException e) {
-				removeTransaction(transactionRequest);
-			}
-		} else {
-			Logger.log("Schedule task is not null : " + transactionRequest.getAmount());
-			if (!SCHEDULED_TASK_FUTURE.cancel(false)) {
-				Logger.log("Schedule task is canceled : " + transactionRequest.getAmount());
-				scheduleTaskToRemoveTranscation(transactionRequest);
-			}
+				removeTransaction(REMAINING_REQUESTS.firstEntry().getValue());
 
-			// Check if tasks are remaining
-			TransactionRequest entryToAdd = REMAINING_REQUESTS.get(transactionRequest.getExpiryTime());
-			if (entryToAdd != null) {
-				Logger.log("Request Entry already exists : " + transactionRequest.getAmount());
-				entryToAdd.addTransaction(transactionRequest);
-			} else {
-				Logger.log("Request Entry does not exists : " + transactionRequest.getAmount());
-				entryToAdd = transactionRequest;
+				// Schedule for remaining entries
+				if (!REMAINING_REQUESTS.isEmpty()) {
+					REMAINING_REQUESTS_LOCK.writeLock().unlock();
+					scheduleTaskToRemoveTranscationIfRequired();
+					return;
+				}
 			}
-
-			REMAINING_REQUESTS.put(entryToAdd.getExpiryTime(), entryToAdd);
-
-			SCHEDULED_TASK_FUTURE = null;
-			scheduleTaskToRemoveTranscation(REMAINING_REQUESTS.firstEntry().getValue());
 		}
 	}
 
@@ -134,29 +136,25 @@ public class StatisticsService {
 
 		@Override
 		public void run() {
+			REMAINING_REQUESTS_LOCK.writeLock().lock();
 			if (!REMAINING_REQUESTS.isEmpty()) {
-				TransactionRequest request = REMAINING_REQUESTS.pollFirstEntry().getValue();
-				Logger.log("Removing transaction : " + request.toString());
-				removeTransaction(request);
+				List<TransactionRequest> requests = REMAINING_REQUESTS.pollFirstEntry().getValue();
+				Logger.log("Removing transaction : " + requests.size() + " exipiry time:"
+						+ requests.get(0).getExpiryTime() + " requests:" + requests.toString());
+				removeTransaction(requests);
 
 				// Schedule next if present
 				if (!REMAINING_REQUESTS.isEmpty()) {
-					TransactionRequest nextRequest = REMAINING_REQUESTS.firstEntry().getValue();
-					Logger.log("Next request found transaction : " + nextRequest.toString());
-					if (nextRequest.getExpiryTime() < System.currentTimeMillis()) {
-						run();
-						return;
-					}
-
 					try {
 						WorkerThread newRunnable = new WorkerThread();
 						SCHEDULED_TASK_FUTURE = SCHEDULED_POOL.schedule(newRunnable,
-								nextRequest.getExpiryTime() - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+								REMAINING_REQUESTS.firstKey() - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
 					} catch (RejectedExecutionException e) {
 						// Rejection happens if the scheduled time is in the past.
 						// TODO : Check if there any other cases when the scheduling fails apart from
 						// the above case
 						Logger.log("Task rejected as it is in the past");
+						REMAINING_REQUESTS_LOCK.writeLock().unlock();
 						run();
 						return;
 					}
@@ -168,6 +166,7 @@ public class StatisticsService {
 			if (REMAINING_REQUESTS.isEmpty()) {
 				SCHEDULED_TASK_FUTURE = null;
 			}
+			REMAINING_REQUESTS_LOCK.writeLock().unlock();
 		}
 	}
 

@@ -79,8 +79,9 @@ public class StatisticsData {
 		this.count = count;
 	}
 
-	public synchronized void removeTranscation(double amount) {
-		this.sum.compareAndSet(this.sum.doubleValue(), CommonUtils.roundDoubleValue(this.sum.doubleValue() - amount));
+	public synchronized void removeTranscation(TransactionRequest request) {
+		this.sum.compareAndSet(this.sum.doubleValue(),
+				CommonUtils.roundDoubleValue(this.sum.doubleValue() - request.getAmount()));
 		this.count.decrementAndGet();
 		if (this.count.intValue() > 0) {
 			this.avg = new AtomicDouble(CommonUtils.roundDoubleValue(this.sum.doubleValue() / this.count.intValue()));

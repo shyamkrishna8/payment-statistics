@@ -31,13 +31,12 @@ public class TestService {
 	}
 
 	public void testRandomStatistics() throws InterruptedException {
-		int i = 3;
+		int i = 10;
 		Random random = new Random();
 		long currentTime = System.currentTimeMillis();
 		while (i > 0) {
-			statisticsService
-					.registerTransaction(new TransactionRequest(CommonUtils.roundDoubleValue(random.nextDouble() * 100),
-							currentTime - i*10, true));
+			statisticsService.registerTransaction(new TransactionRequest(
+					CommonUtils.roundDoubleValue(random.nextDouble() * 100), currentTime - 3 * i * 1000, true));
 			Thread.sleep(random.nextInt(400));
 			Logger.log("Statistics at : " + (System.currentTimeMillis() - currentTime) + " statistics : "
 					+ statisticsService.getStatistics().toString());
@@ -47,8 +46,8 @@ public class TestService {
 		Logger.log("Statistics at end : " + (System.currentTimeMillis() - currentTime) + " statistics : "
 				+ statisticsService.getStatistics().toString());
 		Thread.sleep(120000);
-		Logger.log("Statistics after sleep at end : " + (System.currentTimeMillis() - currentTime)
-				+ " statistics : " + statisticsService.getStatistics().toString());
+		Logger.log("Statistics after sleep at end : " + (System.currentTimeMillis() - currentTime) + " statistics : "
+				+ statisticsService.getStatistics().toString());
 	}
 
 }
