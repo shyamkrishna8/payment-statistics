@@ -1,15 +1,20 @@
 package com.syam.paymentstatistics.pojo;
 
-public class StatisticsDataWithTimeStamp extends StatisticsData {
+public class StatisticsDataResponseWithTimeStamp extends StatisticsDataResponse {
 
 	private long computed_time;
 
-	public StatisticsDataWithTimeStamp() {
+	public StatisticsDataResponseWithTimeStamp() {
 		super();
 	}
 
-	public StatisticsDataWithTimeStamp(StatisticsData statisticsData, long computed_time) {
+	public StatisticsDataResponseWithTimeStamp(StatisticsData statisticsData, long computed_time) {
 		super(statisticsData);
+		this.computed_time = computed_time;
+	}
+
+	public StatisticsDataResponseWithTimeStamp(StatisticsDataResponse statisticsDataResponse, long computed_time) {
+		super(statisticsDataResponse);
 		this.computed_time = computed_time;
 	}
 

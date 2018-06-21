@@ -8,9 +8,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.syam.paymentstatistics.pojo.BasicResponse;
-import com.syam.paymentstatistics.pojo.StatisticsData;
-import com.syam.paymentstatistics.pojo.StatisticsDataWithTimeStamp;
+import com.syam.paymentstatistics.pojo.StatisticsDataResponse;
+import com.syam.paymentstatistics.pojo.StatisticsDataResponseWithTimeStamp;
 import com.syam.paymentstatistics.pojo.TransactionRequest;
+import com.syam.paymentstatistics.utils.Logger;
 
 @RestController
 @RequestMapping("/")
@@ -19,24 +20,39 @@ public class StatisticsController {
 	@Autowired
 	private StatisticsService statisticsService;
 
+	@Autowired
+	private TestService testService;
+
 	@RequestMapping(value = "/transactions", method = RequestMethod.POST)
 	public BasicResponse createNewVideo(@RequestBody TransactionRequest transactionRequest) {
-		System.out.println("Request : " + transactionRequest.toString() + " received at : " + System.currentTimeMillis());
+		System.out
+				.println("Request : " + transactionRequest.toString() + " received at : " + System.currentTimeMillis());
 		BasicResponse response = new BasicResponse();
 		statisticsService.registerTransaction(transactionRequest);
+		Logger.log("Response for transaction : " + transactionRequest.toString() + " done at : "
+				+ System.currentTimeMillis());
 		return response;
 	}
 
 	@RequestMapping(value = "/statistics", method = RequestMethod.GET)
-	public StatisticsData getStatistics(@RequestParam(name="test") Boolean test) {
+	public StatisticsDataResponse getStatistics(@RequestParam(name = "test", required = false) Boolean test) {
 		long current_time = System.currentTimeMillis();
-		System.out.println("Request  for statistics received at : " );
+		Logger.log("Request for statistics received at : ");
 
-		StatisticsData response = statisticsService.getStatistics();
+		StatisticsDataResponse response = statisticsService.getStatistics();
 		if (Boolean.TRUE.equals(test)) {
-			response = new StatisticsDataWithTimeStamp(response, current_time);
+			response = new StatisticsDataResponseWithTimeStamp(response, current_time);
 		}
 
+		Logger.log("Response for statistics done at : " + System.currentTimeMillis() + " response : "
+				+ response.toString());
 		return response;
 	}
+
+	@RequestMapping(value = "/test", method = RequestMethod.GET)
+	public BasicResponse testStatistics() throws InterruptedException {
+		testService.testRandomStatistics();
+		return new BasicResponse();
+	}
+
 }

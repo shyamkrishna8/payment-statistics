@@ -8,7 +8,7 @@ CREATE SEQUENCE transactionamount_id_seq
 CREATE TABLE transactionamount
 (
   "id" integer NOT NULL DEFAULT nextval('transactionamount_id_seq'::regclass),
-  "created" timestamp without time zone,
+  "created" bigint,
   "amount" double precision,
   "time_stamp" bigint,
   CONSTRAINT transactionamount_pkey PRIMARY KEY ("id")

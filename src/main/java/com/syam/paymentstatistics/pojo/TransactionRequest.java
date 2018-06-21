@@ -13,6 +13,13 @@ public class TransactionRequest {
 		super();
 	}
 
+	public TransactionRequest(Double amount, long timestamp, Boolean test) {
+		super();
+		this.amount = amount;
+		this.timestamp = timestamp;
+		this.test = test;
+	}
+
 	public Double getAmount() {
 		return amount;
 	}
@@ -35,6 +42,16 @@ public class TransactionRequest {
 
 	public void setTest(Boolean test) {
 		this.test = test;
+	}
+
+	public long getExpiryTime() {
+		return this.timestamp + Constants.STATISTICS_TIME_WINDOW;
+	}
+
+	public void addTransaction(TransactionRequest request) {
+		if (this.timestamp == request.getTimestamp()) {
+			this.amount += request.getAmount();
+		}
 	}
 
 	public void validate() {

@@ -13,7 +13,7 @@ import com.syam.paymentstatistics.pojo.TransactionRequest;
 public class TransactionAmount {
 	@org.springframework.data.annotation.Id // For spring data
 	@Id // for JPA
-	@GeneratedValue(strategy = GenerationType.AUTO)
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	public Long id;
 
 	private long created = System.currentTimeMillis();
