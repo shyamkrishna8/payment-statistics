@@ -208,8 +208,10 @@ public class StatisticsService {
 	 * 
 	 * @param transactionRequest
 	 */
-	private static void removeTrancationEntryToMinMaxMap(TransactionRequest transactionRequest) {
+	private static void removeTrancationEntryFromMinMaxMap(TransactionRequest transactionRequest) {
 		List<Long> timestamps = ELIGIBLE_MIN_MAX_MAP.get(transactionRequest.getAmount());
+
+		// Remove the request from min max map
 		if (timestamps != null && !timestamps.isEmpty()
 				&& timestamps.contains(Long.valueOf(transactionRequest.getTimestamp()))) {
 			timestamps.removeIf(a -> a.equals(transactionRequest.getTimestamp()));
@@ -217,6 +219,22 @@ public class StatisticsService {
 				ELIGIBLE_MIN_MAX_MAP.remove(transactionRequest.getAmount());
 			} else {
 				ELIGIBLE_MIN_MAX_MAP.put(transactionRequest.getAmount(), timestamps);
+			}
+		}
+
+		// Check if minimum has to be updated
+		if (STATISTICS_DATA.getMin().doubleValue() >= transactionRequest.getAmount()) {
+			// If time stamp is not empty then there could be same value at a different time
+			if (timestamps != null && timestamps.isEmpty()) {
+				STATISTICS_DATA.setMin(new AtomicDouble(ELIGIBLE_MIN_MAX_MAP.firstKey()));
+			}
+		}
+
+		// Check if maximum has to be updated
+		if (STATISTICS_DATA.getMax().doubleValue() <= transactionRequest.getAmount()) {
+			// If time stamp is not empty then there could be same value at a different time
+			if (timestamps != null && timestamps.isEmpty()) {
+				STATISTICS_DATA.setMax(new AtomicDouble(ELIGIBLE_MIN_MAX_MAP.lastKey()));
 			}
 		}
 
@@ -236,7 +254,7 @@ public class StatisticsService {
 		STATISTICS_DATA_LOCK.writeLock().lock();
 		requests.forEach(a -> {
 			STATISTICS_DATA.removeTranscation(a);
-			removeTrancationEntryToMinMaxMap(a);
+			removeTrancationEntryFromMinMaxMap(a);
 		});
 		STATISTICS_DATA_LOCK.writeLock().unlock();
 	}
@@ -261,6 +279,8 @@ public class StatisticsService {
 
 	private static synchronized void scheduleTaskToRemoveTranscationIfRequired() {
 		if (SCHEDULED_TASK_FUTURE == null) {
+			// SCHEDULED_TASK_FUTURE will be null when there are no tasks scheduled. So
+			// schedule a new task for the new time.
 			REMAINING_REQUESTS_LOCK.writeLock().lock();
 			try {
 				SCHEDULED_TASK_FUTURE = SCHEDULED_POOL.schedule(new WorkerThread(),
@@ -274,6 +294,30 @@ public class StatisticsService {
 					REMAINING_REQUESTS_LOCK.writeLock().unlock();
 					scheduleTaskToRemoveTranscationIfRequired();
 					return;
+				}
+			}
+		} else {
+			// If there is a task already scheduled in future, the new request may need to
+			// be expired earlier than the time at which the task is scheduled. Hence we
+			// need to check if it is required to schedule the task.
+			REMAINING_REQUESTS_LOCK.writeLock().lock();
+			if (!REMAINING_REQUESTS.isEmpty()) {
+				// Check if the task need to be rescheduled to an earlier time
+				long firstRequestDelay = REMAINING_REQUESTS.firstEntry().getKey() - System.currentTimeMillis();
+				long remaing_delay = SCHEDULED_TASK_FUTURE.getDelay(TimeUnit.MILLISECONDS);
+
+				if (firstRequestDelay < remaing_delay) {
+					// Reschedule only when the remaining delay is more than 2ms (This number needs
+					// to be finetuned based on testing).
+					if (SCHEDULED_TASK_FUTURE.cancel(false)) {
+						SCHEDULED_TASK_FUTURE = null;
+						REMAINING_REQUESTS_LOCK.writeLock().unlock();
+						scheduleTaskToRemoveTranscationIfRequired();
+						return;
+					} else {
+						// Schedule cancellation fails if task already started execution. In that case,
+						// there is no need to reschedule.
+					}
 				}
 			}
 		}
