@@ -285,7 +285,6 @@ public class StatisticsService {
 			try {
 				SCHEDULED_TASK_FUTURE = SCHEDULED_POOL.schedule(new WorkerThread(),
 						REMAINING_REQUESTS.firstEntry().getKey() - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
-				REMAINING_REQUESTS_LOCK.writeLock().unlock();
 			} catch (RejectedExecutionException e) {
 				removeTransaction(REMAINING_REQUESTS.firstEntry().getValue());
 
@@ -296,6 +295,7 @@ public class StatisticsService {
 					return;
 				}
 			}
+			REMAINING_REQUESTS_LOCK.writeLock().unlock();
 		} else {
 			// If there is a task already scheduled in future, the new request may need to
 			// be expired earlier than the time at which the task is scheduled. Hence we
@@ -320,6 +320,7 @@ public class StatisticsService {
 					}
 				}
 			}
+			REMAINING_REQUESTS_LOCK.writeLock().unlock();
 		}
 	}
 
