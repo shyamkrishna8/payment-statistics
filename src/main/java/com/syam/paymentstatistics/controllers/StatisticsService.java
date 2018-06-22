@@ -12,17 +12,18 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.google.common.util.concurrent.AtomicDouble;
-import com.syam.paymentstatistics.jpa.TransactionAmount;
-import com.syam.paymentstatistics.jpa.TransactionAmountRepository;
 import com.syam.paymentstatistics.pojo.StatisticsData;
 import com.syam.paymentstatistics.pojo.StatisticsDataResponse;
 import com.syam.paymentstatistics.pojo.TransactionRequest;
 import com.syam.paymentstatistics.utils.Logger;
 
+/**
+ * @author syam
+ *
+ */
 @Service
 public class StatisticsService {
 
@@ -60,21 +61,20 @@ public class StatisticsService {
 	// only using the Write lock every where for now.
 	private static final ReadWriteLock REMAINING_REQUESTS_LOCK = new ReentrantReadWriteLock();
 
-	@Autowired
-	private TransactionAmountRepository transactionRepository;
-
+	/**
+	 * This is invoked directly by the POST /transaction API. We validate the
+	 * request at TransactionRequest.validate() where we discard requests older than
+	 * 60 seconds. This interval is configurable at
+	 * Constants.TRANSACTION_ACCEPTANCE_DURATION. Post validation, we update
+	 * STATISTICS_DATA object.
+	 * 
+	 * @param transactionRequest
+	 */
 	public void registerTransaction(TransactionRequest transactionRequest) {
 		Logger.log("Registering request : " + transactionRequest.toString());
-		long requestTime = System.currentTimeMillis();
 
 		// Validate request
 		transactionRequest.validate();
-
-		// If test mode is true, save the transaction in db for tracking
-		if (Boolean.TRUE.equals(transactionRequest.getTest())) {
-			TransactionAmount entry = new TransactionAmount(transactionRequest, requestTime);
-			transactionRepository.save(entry);
-		}
 
 		// Apply the transaction amount on the statistics data object
 		applyTransaction(transactionRequest);
@@ -82,6 +82,15 @@ public class StatisticsService {
 				+ STATISTICS_DATA.toString());
 	}
 
+	/**
+	 * This is invoked directly by the GET statistics API. STATISTICS_DATA_LOCK
+	 * ensures that no one is updating the data while reading. This method is
+	 * guaranteed to be O(1) as there is absolutely no other operation performed in
+	 * this method. The only overhead is obtaining the STATISTICS_DATA_LOCK datalock
+	 * for reading.
+	 * 
+	 * @return
+	 */
 	public StatisticsDataResponse getStatistics() {
 		STATISTICS_DATA_LOCK.readLock().lock();
 		StatisticsDataResponse statisticsData = new StatisticsDataResponse(STATISTICS_DATA);
@@ -89,6 +98,14 @@ public class StatisticsService {
 		return statisticsData;
 	}
 
+	/**
+	 * For every new transaction, this method obtains the STATISTICS_DATA_LOCK lock,
+	 * updates the STATISTICS_DATA object accordingly, add the future transaction
+	 * removal request to the REMAINING_REQUESTS and schedules a task if not present
+	 * already.
+	 * 
+	 * @param transactionRequest
+	 */
 	private static void applyTransaction(TransactionRequest transactionRequest) {
 		Logger.log("Applying transaction : " + transactionRequest.getAmount());
 		// Update statistics object with the transaction values
@@ -171,6 +188,11 @@ public class StatisticsService {
 		Logger.log("Applying transaction done : " + transactionRequest.getAmount());
 	}
 
+	/**
+	 * Adds the transaction request to the ELIGIBLE_MIN_MAX_MAP.
+	 * 
+	 * @param transactionRequest
+	 */
 	private static void addTrancationEntryToMinMaxMap(TransactionRequest transactionRequest) {
 		List<Long> timestamps = new ArrayList<>();
 		if (ELIGIBLE_MIN_MAX_MAP.get(transactionRequest.getAmount()) != null
@@ -181,6 +203,11 @@ public class StatisticsService {
 		ELIGIBLE_MIN_MAX_MAP.put(transactionRequest.getAmount(), timestamps);
 	}
 
+	/**
+	 * Removes the transaction request from the ELIGIBLE_MIN_MAX_MAP
+	 * 
+	 * @param transactionRequest
+	 */
 	private static void removeTrancationEntryToMinMaxMap(TransactionRequest transactionRequest) {
 		List<Long> timestamps = ELIGIBLE_MIN_MAX_MAP.get(transactionRequest.getAmount());
 		if (timestamps != null && !timestamps.isEmpty()
@@ -198,6 +225,12 @@ public class StatisticsService {
 		}
 	}
 
+	/**
+	 * This method removes a set of Transaction requests which are expired from the
+	 * STATISTICS_DATA object post which it will update the MinMax Map.
+	 * 
+	 * @param requests
+	 */
 	private static void removeTransaction(List<TransactionRequest> requests) {
 		// Update statistics object with the transaction values
 		STATISTICS_DATA_LOCK.writeLock().lock();
@@ -208,6 +241,12 @@ public class StatisticsService {
 		STATISTICS_DATA_LOCK.writeLock().unlock();
 	}
 
+	/**
+	 * Any access to REMAINING_REQUESTS object, REMAINING_REQUESTS_LOCK needs to be
+	 * obtained.
+	 * 
+	 * @param request
+	 */
 	private static void addNewRequestsToRemoveTranscation(TransactionRequest request) {
 		// Add new requests
 		REMAINING_REQUESTS_LOCK.writeLock().lock();

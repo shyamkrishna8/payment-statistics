@@ -4,12 +4,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.syam.paymentstatistics.pojo.BasicResponse;
 import com.syam.paymentstatistics.pojo.StatisticsDataResponse;
-import com.syam.paymentstatistics.pojo.StatisticsDataResponseWithTimeStamp;
 import com.syam.paymentstatistics.pojo.TransactionRequest;
 import com.syam.paymentstatistics.utils.Logger;
 
@@ -35,16 +33,10 @@ public class StatisticsController {
 	}
 
 	@RequestMapping(value = "/statistics", method = RequestMethod.GET)
-	public StatisticsDataResponse getStatistics(@RequestParam(name = "test", required = false) Boolean test) {
-		long current_time = System.currentTimeMillis();
-		Logger.log("Request for statistics received at : ");
-
+	public StatisticsDataResponse getStatistics() {
+		Logger.log("Request for statistics received at : " + System.currentTimeMillis());
 		StatisticsDataResponse response = statisticsService.getStatistics();
-		if (Boolean.TRUE.equals(test)) {
-			response = new StatisticsDataResponseWithTimeStamp(response, current_time);
-		}
-
-		Logger.log("Response for statistics done at : " + System.currentTimeMillis() + " response : "
+		Logger.log("Response for statistics completed at : " + System.currentTimeMillis() + " response : "
 				+ response.toString());
 		return response;
 	}

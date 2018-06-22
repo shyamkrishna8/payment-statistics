@@ -37,10 +37,7 @@ public class TestService {
 		Logger.log("First batch starting  : " + currentTime);
 		while (i > 0) {
 			statisticsService.registerTransaction(new TransactionRequest(
-					CommonUtils.roundDoubleValue(random.nextDouble() * 100), currentTime - 40 * 1000 + i*1000, true));
-			// Logger.log("Statistics at : " + (System.currentTimeMillis() - currentTime) +
-			// " statistics : "
-			// + statisticsService.getStatistics().toString());
+					CommonUtils.roundDoubleValue(random.nextDouble() * 100), currentTime - 40 * 1000 + i * 1000, true));
 			i--;
 		}
 		Logger.log("Statistics at : " + (System.currentTimeMillis() - currentTime) + " statistics : "
@@ -55,9 +52,6 @@ public class TestService {
 		while (i > 0) {
 			statisticsService.registerTransaction(new TransactionRequest(
 					CommonUtils.roundDoubleValue(random.nextDouble() * 100), currentTime - 40 * 1000 + i, true));
-			// Logger.log("Statistics at : " + (System.currentTimeMillis() - currentTime) +
-			// " statistics : "
-			// + statisticsService.getStatistics().toString());
 			i--;
 		}
 		Logger.log("Second batch ending : " + System.currentTimeMillis());
